@@ -42,7 +42,7 @@ namespace NServiceBus.Timeout.Hosting.Windows
                 return;
             }
 
-            SetExceptionHeaders(message, e, reason);
+            SetFailureHeaders(message, e, reason);
             try
             {
                 var sender = Configure.Instance.Builder.Build<ISendMessages>();
@@ -68,18 +68,11 @@ namespace NServiceBus.Timeout.Hosting.Windows
             localAddress = address;
         }
 
-        void SetExceptionHeaders(TransportMessage message, Exception e, string reason)
+        void SetFailureHeaders(TransportMessage message, Exception e, string reason)
         {
-            message.Headers["NServiceBus.ExceptionInfo.Reason"] = reason;
-            message.Headers["NServiceBus.ExceptionInfo.ExceptionType"] = e.GetType().FullName;
+			message.Headers["NServiceBus.ExceptionInfo.Reason"] = reason;
 
-            if (e.InnerException != null)
-                message.Headers["NServiceBus.ExceptionInfo.InnerExceptionType"] = e.InnerException.GetType().FullName;
-
-            message.Headers["NServiceBus.ExceptionInfo.HelpLink"] = e.HelpLink;
-            message.Headers["NServiceBus.ExceptionInfo.Message"] = e.Message;
-            message.Headers["NServiceBus.ExceptionInfo.Source"] = e.Source;
-            message.Headers["NServiceBus.ExceptionInfo.StackTrace"] = e.StackTrace;
+			SetExceptionDetailHeaders(message,e,"NServiceBus.ExceptionInfo");
 
             message.Headers[TransportHeaderKeys.OriginalId] = message.Id;
 
@@ -88,5 +81,20 @@ namespace NServiceBus.Timeout.Hosting.Windows
             message.Headers[FaultsHeaderKeys.FailedQ] = failedQ.ToString();
             message.Headers["NServiceBus.TimeOfFailure"] = DateTime.UtcNow.ToWireFormattedString();
         }
+
+		private static void SetExceptionDetailHeaders(TransportMessage message, Exception e,string prefix) {
+			
+			message.Headers[prefix+"ExceptionType"] = e.GetType().FullName;
+
+			if(e.InnerException != null) {
+				SetExceptionDetailHeaders(message,e.InnerException,prefix+"InnerException.");
+				//message.Headers["NServiceBus.ExceptionInfo.InnerExceptionType"] = e.InnerException.GetType().FullName;
+			}
+
+			message.Headers[prefix+"HelpLink"] = e.HelpLink;
+			message.Headers[prefix+"Message"] = e.Message;
+			message.Headers[prefix+"Source"] = e.Source;
+			message.Headers[prefix+"StackTrace"] = e.StackTrace;
+		}
     }
 }
